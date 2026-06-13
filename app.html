@@ -1080,15 +1080,19 @@
       (TRAIL_MAX_SHRINK_SPEED - TRAIL_MIN_SHRINK_SPEED) * variation;
   }
 
-  function getTrailDither(x, y){
+  function getTrailNoise(x, y){
     const gridX = Math.round(x / cfg.cell);
     const gridY = Math.round(y / cfg.cell);
     const coarse = Math.sin(gridX * 71.31 + gridY * 29.17) * 19341.731;
     const fine = Math.sin(gridX * 17.73 - gridY * 83.91 + 2.4) * 41758.129;
-    const noise =
+    return (
       (coarse - Math.floor(coarse)) * 0.68 +
-      (fine - Math.floor(fine)) * 0.32;
-    return (noise - 0.5) * 2 * TRAIL_DITHER_AMOUNT;
+      (fine - Math.floor(fine)) * 0.32
+    );
+  }
+
+  function getTrailDither(x, y){
+    return (getTrailNoise(x, y) - 0.5) * 2 * TRAIL_DITHER_AMOUNT;
   }
 
   function queuePointerSegment(nx, ny){
@@ -1182,9 +1186,18 @@
       const segmentDistanceSq = segmentActive
         ? pointSegmentDistSq(cx[i], cy[i], prevFollowerX, prevFollowerY, followerX, followerY)
         : Infinity;
+      const trailNoise = getTrailNoise(cx[i], cy[i]);
       const trailDither = getTrailDither(cx[i], cy[i]);
       const edge = Math.sqrt(segmentDistanceSq) / Math.max(1, segmentRadius);
-      if (segmentDistanceSq <= segmentR2 && edge <= 1 + trailDither) {
+      const creationCore = 0.76;
+      const creationFringe = 1 + TRAIL_DITHER_AMOUNT;
+      const fringeCoverage = smoothstep(clamp(
+        (creationFringe - edge) / (creationFringe - creationCore),
+        0,
+        1
+      ));
+      const entersTrail = edge <= creationCore || trailNoise <= fringeCoverage;
+      if (segmentDistanceSq <= segmentR2 && entersTrail) {
         if (trailActive[i]) {
           trailEdge[i] = Math.min(trailEdge[i], edge);
         } else {
