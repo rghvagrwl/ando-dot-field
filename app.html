@@ -616,8 +616,9 @@
   const TRAIL_DYNAMIC_HEIGHT_RATIO = 0.08;
   const RESTING_WAVE_SPEED = 0.00009;
   const RESTING_WAVE_DENSITY = 1.15;
-  const RESTING_WAVE_WOBBLE = 0.04;
+  const RESTING_WAVE_WOBBLE = 0.085;
   const RESTING_WAVE_WOBBLE_SPEED = 0.00015;
+  const RESTING_WAVE_DITHER = 0.22;
 
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0;
@@ -1091,12 +1092,18 @@
     const normalizedX = x / Math.max(W, 1);
     const normalizedY = y / Math.max(H, 1);
     const wobble =
-      Math.sin(normalizedX * TAU * 1.4 + now * RESTING_WAVE_WOBBLE_SPEED) * RESTING_WAVE_WOBBLE +
-      Math.sin(normalizedX * TAU * 3.2 - now * RESTING_WAVE_WOBBLE_SPEED * 1.7) * (RESTING_WAVE_WOBBLE * 0.35);
+      Math.sin(normalizedX * TAU * 1.15 + now * RESTING_WAVE_WOBBLE_SPEED) * RESTING_WAVE_WOBBLE +
+      Math.sin(normalizedX * TAU * 2.8 - now * RESTING_WAVE_WOBBLE_SPEED * 1.35) * (RESTING_WAVE_WOBBLE * 0.48) +
+      Math.sin(normalizedX * TAU * 6.4 + now * RESTING_WAVE_WOBBLE_SPEED * 0.62) * (RESTING_WAVE_WOBBLE * 0.16);
     const phase = (normalizedY + wobble) * RESTING_WAVE_DENSITY - now * RESTING_WAVE_SPEED;
-    const wave = Math.sin(phase * TAU);
-    if (wave > 0.72) return 2;
-    if (wave > -0.72) return 1;
+    const gridX = Math.round(x / cfg.cell);
+    const gridY = Math.round(y / cfg.cell);
+    const staticNoise = Math.sin(gridX * 91.73 + gridY * 37.19) * 43758.5453;
+    const dither = (staticNoise - Math.floor(staticNoise) - 0.5) * RESTING_WAVE_DITHER;
+    const grainPulse = Math.sin(gridX * 0.41 + gridY * 0.27 + now * 0.00022) * 0.035;
+    const wave = Math.sin(phase * TAU) + dither + grainPulse;
+    if (wave > 0.76) return 2;
+    if (wave > -0.76) return 1;
     return 0;
   }
 
