@@ -609,6 +609,7 @@
   const TRAIL_SHRINK_MS = 4400;
   const TRAIL_MIN_SHRINK_SPEED = 0.78;
   const TRAIL_MAX_SHRINK_SPEED = 1.32;
+  const TRAIL_DITHER_AMOUNT = 0.14;
   const HOVER_ALPHA_THRESHOLD = 12;
   const HOVER_BASE_RADIUS = 34;
   const HOVER_PULSE_RADIUS = 22;
@@ -810,6 +811,25 @@
     return {
       x: (swirlA + swirlC * 0.7) * flow,
       y: (swirlB - swirlC * 0.5) * flow
+    };
+  }
+
+  function interactiveCellOffset(x, y, now, clusterStrength, isPointerMoving, interactionRadius){
+    const live = livingCellOffset(x, y, now, clusterStrength);
+    if (!isPointerMoving) return live;
+    const dx = x - followerX;
+    const dy = y - followerY;
+    const distance = Math.hypot(dx, dy);
+    const reach = Math.max(28, interactionRadius * 1.15);
+    if (distance >= reach) return live;
+    const proximity = smoothstep(1 - distance / reach);
+    const directionX = distance > 0.001 ? dx / distance : 0;
+    const directionY = distance > 0.001 ? dy / distance : 0;
+    const pulse = 0.72 + Math.sin(now * 0.012 + x * 0.035 - y * 0.021) * 0.28;
+    const force = proximity * (3.2 + clusterStrength * 4.8) * pulse;
+    return {
+      x: live.x + directionX * force - directionY * force * 0.42,
+      y: live.y + directionY * force + directionX * force * 0.42
     };
   }
 
@@ -1060,7 +1080,19 @@
       (TRAIL_MAX_SHRINK_SPEED - TRAIL_MIN_SHRINK_SPEED) * variation;
   }
 
+  function getTrailDither(x, y){
+    const gridX = Math.round(x / cfg.cell);
+    const gridY = Math.round(y / cfg.cell);
+    const coarse = Math.sin(gridX * 71.31 + gridY * 29.17) * 19341.731;
+    const fine = Math.sin(gridX * 17.73 - gridY * 83.91 + 2.4) * 41758.129;
+    const noise =
+      (coarse - Math.floor(coarse)) * 0.68 +
+      (fine - Math.floor(fine)) * 0.32;
+    return (noise - 0.5) * 2 * TRAIL_DITHER_AMOUNT;
+  }
+
   function queuePointerSegment(nx, ny){
+    const now = performance.now();
     if (!hasPointer) {
       hasPointer = true;
       followerX = nx;
@@ -1069,7 +1101,7 @@
     }
     px = nx;
     py = ny;
-    lastPointerInputAt = performance.now();
+    lastPointerInputAt = now;
   }
 
   function getAdaptiveTrailRadius(now){
@@ -1124,7 +1156,8 @@
     trailSpeed = trailSpeed * 0.92 + moveDist * 0.08;
     const segmentActive = moveDist > 0.001;
     const segmentRadius = getAdaptiveTrailRadius(now);
-    const segmentR2 = segmentRadius * segmentRadius;
+    const segmentReach = segmentRadius * (1 + TRAIL_DITHER_AMOUNT);
+    const segmentR2 = segmentReach * segmentReach;
     drawBackdropDots(idleMaskState, prevFollowerX, prevFollowerY, followerX, followerY, segmentActive, segmentRadius);
 
     const restingLevels = [
@@ -1149,8 +1182,9 @@
       const segmentDistanceSq = segmentActive
         ? pointSegmentDistSq(cx[i], cy[i], prevFollowerX, prevFollowerY, followerX, followerY)
         : Infinity;
-      if (segmentDistanceSq <= segmentR2) {
-        const edge = Math.sqrt(segmentDistanceSq) / Math.max(1, segmentRadius);
+      const trailDither = getTrailDither(cx[i], cy[i]);
+      const edge = Math.sqrt(segmentDistanceSq) / Math.max(1, segmentRadius);
+      if (segmentDistanceSq <= segmentR2 && edge <= 1 + trailDither) {
         if (trailActive[i]) {
           trailEdge[i] = Math.min(trailEdge[i], edge);
         } else {
@@ -1166,7 +1200,8 @@
         0,
         1 - shrinkProgress * getTrailShrinkSpeed(cx[i], cy[i])
       );
-      if (trailActive[i] && trailEdge[i] > localEnvelope) {
+      const ditheredEnvelope = localEnvelope * (1 + trailDither);
+      if (trailActive[i] && trailEdge[i] > ditheredEnvelope) {
         trailActive[i] = 0;
       }
       trailVisible[i] = trailActive[i];
@@ -1194,7 +1229,14 @@
       }
       if (idleActive && !trailVisible[i]) {
         if (strong[i]) {
-          const live = livingCellOffset(cx[i], cy[i], now, strongCluster[i] || 0.5);
+          const live = interactiveCellOffset(
+            cx[i],
+            cy[i],
+            now,
+            strongCluster[i] || 0.5,
+            segmentActive,
+            segmentRadius
+          );
           const x = snap(cx[i] + live.x);
           const y = snap(cy[i] + live.y);
           ctx.fillStyle = rgba(cfg.accentHexStrong, Math.min(0.18, cfg.strongA * 0.18));
@@ -1214,8 +1256,16 @@
       }
       if (!trailVisible[i]) continue;
       if (strong[i]) {
-        const x = snap(cx[i]);
-        const y = snap(cy[i]);
+        const live = interactiveCellOffset(
+          cx[i],
+          cy[i],
+          now,
+          strongCluster[i] || 0.5,
+          segmentActive,
+          segmentRadius
+        );
+        const x = snap(cx[i] + live.x);
+        const y = snap(cy[i] + live.y);
         ctx.fillStyle = rgba(cfg.accentHexStrong, Math.min(0.18, cfg.strongA * 0.18));
         ctx.beginPath();
         ctx.arc(x, y, dotRadius * 1.14, 0, TAU);
