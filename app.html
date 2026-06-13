@@ -609,7 +609,7 @@
   const TRAIL_SHRINK_MS = 4400;
   const TRAIL_MIN_SHRINK_SPEED = 0.78;
   const TRAIL_MAX_SHRINK_SPEED = 1.32;
-  const TRAIL_DITHER_AMOUNT = 0.14;
+  const TRAIL_DITHER_AMOUNT = 0.24;
   const HOVER_ALPHA_THRESHOLD = 12;
   const HOVER_BASE_RADIUS = 34;
   const HOVER_PULSE_RADIUS = 22;
@@ -620,6 +620,7 @@
   const RESTING_WAVE_WOBBLE = 0.085;
   const RESTING_WAVE_WOBBLE_SPEED = 0.00015;
   const RESTING_WAVE_DITHER = 0.22;
+  const IDLE_MASK_DITHER_WIDTH = 10;
 
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0;
@@ -815,22 +816,7 @@
   }
 
   function interactiveCellOffset(x, y, now, clusterStrength, isPointerMoving, interactionRadius){
-    const live = livingCellOffset(x, y, now, clusterStrength);
-    if (!isPointerMoving) return live;
-    const dx = x - followerX;
-    const dy = y - followerY;
-    const distance = Math.hypot(dx, dy);
-    const reach = Math.max(28, interactionRadius * 1.15);
-    if (distance >= reach) return live;
-    const proximity = smoothstep(1 - distance / reach);
-    const directionX = distance > 0.001 ? dx / distance : 0;
-    const directionY = distance > 0.001 ? dy / distance : 0;
-    const pulse = 0.72 + Math.sin(now * 0.012 + x * 0.035 - y * 0.021) * 0.28;
-    const force = proximity * (3.2 + clusterStrength * 4.8) * pulse;
-    return {
-      x: live.x + directionX * force - directionY * force * 0.42,
-      y: live.y + directionY * force + directionX * force * 0.42
-    };
+    return livingCellOffset(x, y, now, clusterStrength);
   }
 
   function syncSwatch(button, value){
@@ -968,6 +954,11 @@
     maskCtx.save();
     maskCtx.scale(1 / MDS, 1 / MDS);
     applyIdlePathTransform(maskCtx, transform);
+    maskCtx.strokeStyle = 'rgba(0,0,0,.34)';
+    maskCtx.lineWidth = IDLE_MASK_DITHER_WIDTH / Math.max(transform.scl, 0.0001);
+    maskCtx.lineJoin = 'round';
+    maskCtx.lineCap = 'round';
+    maskCtx.stroke(IDLE_PATH);
     maskCtx.fillStyle = '#000';
     maskCtx.fill(IDLE_PATH);
     maskCtx.restore();
@@ -975,6 +966,17 @@
       data: maskCtx.getImageData(0, 0, maskW, maskH).data,
       transform
     };
+  }
+
+  function isIdleMaskDotActive(x, y, idleMask){
+    if (!idleMask) return false;
+    const sx = (x / MDS) | 0;
+    const sy = (y / MDS) | 0;
+    if (sx < 0 || sy < 0 || sx >= maskW || sy >= maskH) return false;
+    const alpha = idleMask[(sy * maskW + sx) * 4 + 3];
+    if (alpha >= 220) return true;
+    if (alpha <= 8) return false;
+    return getTrailNoise(x + 17, y - 29) < alpha / 255;
   }
 
   function drawBackdropDots(idleMaskState, prevX, prevY, nextX, nextY, segmentActive, segmentRadius){
@@ -1175,13 +1177,7 @@
 
     for (let i = 0; i < N; i += 1) {
       let idleActive = false;
-      if (idleMask) {
-        const sx = (cx[i] / MDS) | 0;
-        const sy = (cy[i] / MDS) | 0;
-        if (sx >= 0 && sy >= 0 && sx < maskW && sy < maskH && idleMask[(sy * maskW + sx) * 4 + 3] > 40) {
-          idleActive = true;
-        }
-      }
+      idleActive = isIdleMaskDotActive(cx[i], cy[i], idleMask);
 
       const segmentDistanceSq = segmentActive
         ? pointSegmentDistSq(cx[i], cy[i], prevFollowerX, prevFollowerY, followerX, followerY)
@@ -1189,13 +1185,13 @@
       const trailNoise = getTrailNoise(cx[i], cy[i]);
       const trailDither = getTrailDither(cx[i], cy[i]);
       const edge = Math.sqrt(segmentDistanceSq) / Math.max(1, segmentRadius);
-      const creationCore = 0.76;
+      const creationCore = 0.64;
       const creationFringe = 1 + TRAIL_DITHER_AMOUNT;
-      const fringeCoverage = smoothstep(clamp(
+      const fringeCoverage = Math.pow(smoothstep(clamp(
         (creationFringe - edge) / (creationFringe - creationCore),
         0,
         1
-      ));
+      )), 1.35);
       const entersTrail = edge <= creationCore || trailNoise <= fringeCoverage;
       if (segmentDistanceSq <= segmentR2 && entersTrail) {
         if (trailActive[i]) {
@@ -1235,11 +1231,7 @@
     const dotRadius = snapSize(Math.max(scaledDotR, scaledBaseR));
     for (let i = 0; i < N; i += 1) {
       let idleActive = false;
-      if (idleMask) {
-        const sx = (cx[i] / MDS) | 0;
-        const sy = (cy[i] / MDS) | 0;
-        idleActive = sx >= 0 && sy >= 0 && sx < maskW && sy < maskH && idleMask[(sy * maskW + sx) * 4 + 3] > 40;
-      }
+      idleActive = isIdleMaskDotActive(cx[i], cy[i], idleMask);
       if (idleActive && !trailVisible[i]) {
         if (strong[i]) {
           const live = interactiveCellOffset(
