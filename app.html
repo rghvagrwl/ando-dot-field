@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ANDO — dot field</title>
+<style>
+  @font-face{
+    font-family:"Geist";
+    src:url("./Geist-Regular.ttf") format("truetype");
+    font-weight:400;
+    font-style:normal;
+  }
+  :root{
+    --bg:#FAFAF8;
+    --accent:#2563EB;
+    --ink:#2b2b2b;
+    --muted:#b7b7b2;
+    --line:rgba(24,24,24,.08);
+    --soft:rgba(24,24,24,.03);
+    --sidebar-width:360px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    font-family:"Geist",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    overflow:hidden;
+  }
+  .app{
+    position:relative;
+    display:flex;
+    width:100%;
+    height:100%;
+  }
+  .sidebar,
+  .sidebar-handle,
+  .picker-panel{
+    display:none !important;
+  }
+  .sidebar{
+    position:relative;
+    z-index:8;
+    flex:0 0 var(--sidebar-width);
+    width:var(--sidebar-width);
+    height:100%;
+    padding:152px 20px 24px;
+    background:var(--bg);
+    border-left:1px solid var(--line);
+    transition:flex-basis .28s ease,width .28s ease,padding .28s ease,border-color .28s ease;
+    overflow:hidden;
+  }
+  body.sidebar-closed .sidebar{
+    flex-basis:0;
+    width:0;
+    padding-left:0;
+    padding-right:0;
+    border-color:transparent;
+  }
+  .sidebar-inner{
+    width:calc(var(--sidebar-width) - 40px);
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    transition:opacity .18s ease,transform .18s ease;
+  }
+  .sidebar-header{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .sidebar-main{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin:auto 0;
+  }
+  .sidebar-footer{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:auto;
+  }
+  body.sidebar-closed .sidebar-inner{
+    opacity:0;
+    transform:translateX(-12px);
+    pointer-events:none;
+  }
+  .sidebar-handle{
+    position:fixed;
+    top:24px;
+    right:24px;
+    z-index:12;
+    width:42px;
+    height:42px;
+    border:none;
+    border-radius:999px;
+    background:rgba(0,0,0,.06);
+    color:rgba(43,43,43,.68);
+    display:grid;
+    place-items:center;
+    cursor:pointer;
+    transition:background .18s ease,color .18s ease,transform .18s ease,opacity .18s ease;
+  }
+  .sidebar-handle:hover{
+    background:rgba(0,0,0,.09);
+    color:rgba(43,43,43,.82);
+  }
+  .sidebar-handle svg{
+    width:18px;
+    height:18px;
+    stroke:currentColor;
+    stroke-width:2.8;
+    fill:none;
+    stroke-linecap:round;
+  }
+  .stage-wrap{
+    position:relative;
+    flex:1 1 auto;
+    min-width:0;
+    height:100%;
+  }
+  .stage{position:relative;width:100%;height:100%;cursor:default;}
+  canvas{display:block;width:100%;height:100%;cursor:default;}
+  .sidebar-title{
+    font-size:28px;
+    line-height:1;
+    letter-spacing:-.04em;
+    font-weight:400;
+    color:var(--ink);
+  }
+  .color-card{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .word-switch{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .toggle-button{
+    width:100%;
+    height:42px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:var(--soft);
+    color:rgba(43,43,43,.62);
+    cursor:pointer;
+    font:inherit;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.04em;
+    transition:background .15s ease,border-color .15s ease,color .15s ease;
+  }
+  .word-button{
+    height:42px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:var(--soft);
+    color:rgba(43,43,43,.62);
+    cursor:pointer;
+    font:inherit;
+    font-size:13px;
+    letter-spacing:.04em;
+    transition:background .15s ease,border-color .15s ease,color .15s ease;
+  }
+  .word-button.is-active{
+    background:rgba(37,99,235,.18);
+    border-color:rgba(37,99,235,.72);
+    color:var(--ink);
+  }
+  .toggle-button.is-active{
+    background:rgba(37,99,235,.18);
+    border-color:rgba(37,99,235,.72);
+    color:var(--ink);
+  }
+  .color-card label{
+    display:block;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .compact-control{
+    display:grid;
+    grid-template-columns:56px 1fr 96px;
+    align-items:center;
+    min-height:58px;
+    background:var(--soft);
+    border:1px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+  }
+  .compact-control + .compact-control{margin-top:8px;}
+  .compact-control.compact-control--hex-only{
+    grid-template-columns:56px 1fr;
+  }
+  .swatch-button{
+    width:56px;
+    height:58px;
+    border:none;
+    background:transparent;
+    padding:10px 12px;
+    cursor:pointer;
+    appearance:none;
+  }
+  .swatch-button::before{
+    content:"";
+    display:block;
+    width:100%;
+    height:100%;
+    border-radius:10px;
+    background:var(--swatch, #ffffff);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);
+  }
+  .swatch-button:focus-visible{
+    outline:2px solid rgba(37,99,235,.42);
+    outline-offset:2px;
+  }
+  .compact-hex,
+  .compact-number{
+    width:100%;
+    height:58px;
+    border:none;
+    background:transparent;
+    padding:0 10px;
+    color:var(--ink);
+    font:inherit;
+  }
+  .compact-hex{
+    font-size:15px;
+    letter-spacing:.01em;
+  }
+  .compact-hex:focus,
+  .compact-number:focus{
+    outline:none;
+  }
+  .compact-opacity{
+    display:grid;
+    grid-template-columns:1fr 22px;
+    align-items:center;
+    align-self:stretch;
+    border-left:1px solid var(--line);
+    padding:0 10px 0 12px;
+  }
+  .compact-number{
+    padding:0;
+    text-align:center;
+    font-size:16px;
+  }
+  .compact-number::-webkit-outer-spin-button,
+  .compact-number::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  .compact-number[type=number]{
+    -moz-appearance:textfield;
+    appearance:textfield;
+  }
+  .compact-opacity span{
+    color:rgba(43,43,43,.56);
+    font-size:15px;
+    text-align:right;
+  }
+  .picker-panel{
+    position:fixed;
+    z-index:30;
+    width:326px;
+    padding:14px;
+    border-radius:18px;
+    background:#2f2f2f;
+    box-shadow:0 22px 50px rgba(0,0,0,.32), 0 2px 10px rgba(0,0,0,.14);
+    color:#fff;
+  }
+  .picker-panel[hidden]{
+    display:none;
+  }
+  .picker-surface{
+    position:relative;
+    height:286px;
+    border-radius:12px;
+    overflow:hidden;
+    background:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(0 100% 50%));
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.06);
+    cursor:crosshair;
+  }
+  .picker-surface-handle,
+  .picker-slider-handle{
+    position:absolute;
+    width:18px;
+    height:18px;
+    border-radius:999px;
+    background:#fff;
+    border:2px solid rgba(255,255,255,.92);
+    box-shadow:0 4px 10px rgba(0,0,0,.28);
+    pointer-events:none;
+    transform:translate(-50%, -50%);
+  }
+  .picker-sliders{
+    margin-top:14px;
+    display:grid;
+    gap:12px;
+  }
+  .picker-slider-wrap{
+    position:relative;
+    height:30px;
+    display:flex;
+    align-items:center;
+  }
+  .picker-slider-track{
+    position:absolute;
+    inset:0;
+    border-radius:999px;
+    overflow:hidden;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.1);
+  }
+  .picker-slider-track--hue{
+    background:linear-gradient(90deg,#f00 0%,#ff0 16%,#0f0 33%,#0ff 50%,#00f 66%,#f0f 83%,#f00 100%);
+  }
+  .picker-slider-track--alpha{
+    background:
+      linear-gradient(45deg, rgba(255,255,255,.18) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.18) 75%),
+      linear-gradient(45deg, rgba(255,255,255,.18) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.18) 75%);
+    background-position:0 0, 8px 8px;
+    background-size:16px 16px;
+  }
+  .picker-slider-track--alpha::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(90deg, var(--alpha-start, rgba(255,255,255,0)), var(--alpha-end, rgba(255,255,255,1)));
+  }
+  .picker-slider{
+    position:relative;
+    z-index:1;
+    width:100%;
+    margin:0;
+    background:transparent;
+    appearance:none;
+    -webkit-appearance:none;
+    cursor:pointer;
+  }
+  .picker-slider:focus{
+    outline:none;
+  }
+  .picker-slider::-webkit-slider-runnable-track{
+    height:30px;
+    background:transparent;
+  }
+  .picker-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:30px;
+    height:30px;
+    border-radius:999px;
+    border:4px solid #fff;
+    background:transparent;
+    box-shadow:0 4px 10px rgba(0,0,0,.28);
+    margin-top:0;
+  }
+  .picker-slider::-moz-range-track{
+    height:30px;
+    background:transparent;
+    border:none;
+  }
+  .picker-slider::-moz-range-thumb{
+    width:22px;
+    height:22px;
+    border-radius:999px;
+    border:4px solid #fff;
+    background:transparent;
+    box-shadow:0 4px 10px rgba(0,0,0,.28);
+  }
+  .picker-alpha-wrap.is-hidden{
+    display:none;
+  }
+  .picker-footer{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:74px 1fr 76px 24px;
+    gap:8px;
+    align-items:center;
+  }
+  .picker-mode,
+  .picker-input{
+    height:48px;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;
+    background:#3a3a3a;
+    color:#fff;
+    font:inherit;
+  }
+  .picker-mode{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .picker-input{
+    padding:0 12px;
+  }
+  .picker-input--hex{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace;
+    font-size:15px;
+  }
+  .picker-input--opacity{
+    text-align:center;
+    font-size:15px;
+  }
+  .picker-input:focus{
+    outline:none;
+    border-color:rgba(255,255,255,.26);
+  }
+  .picker-input::-webkit-outer-spin-button,
+  .picker-input::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  .picker-input[type=number]{
+    appearance:textfield;
+    -moz-appearance:textfield;
+  }
+  .picker-percent{
+    font-size:15px;
+    color:rgba(255,255,255,.7);
+    text-align:center;
+  }
+  .picker-percent.is-hidden{
+    visibility:hidden;
+  }
+  @media (max-width: 900px){
+    :root{
+      --sidebar-width:320px;
+    }
+    .sidebar-handle{
+      width:42px;
+      height:42px;
+      top:18px;
+      right:18px;
+    }
+    .sidebar-handle svg{
+      width:18px;
+      height:18px;
+    }
+  }
+  @media (max-width: 700px){
+    :root{
+      --sidebar-width:min(100vw,320px);
+    }
+  }
+</style>
+</head>
+<body class="sidebar-open">
+  <div class="app">
+    <div class="stage-wrap">
+      <div class="stage" id="stage">
+        <canvas id="c"></canvas>
+      </div>
+    </div>
+
+    <aside class="sidebar panel is-open" id="panel">
+      <div class="sidebar-inner panel-body" id="panelBody">
+        <div class="sidebar-header">
+          <h1 class="sidebar-title">Controls</h1>
+        </div>
+
+        <div class="sidebar-main">
+          <div class="color-card">
+            <label>Wordmark</label>
+            <div class="word-switch">
+              <button class="word-button is-active" id="wordUpper" type="button">ANDO</button>
+              <button class="word-button" id="wordLower" type="button">ando</button>
+            </div>
+          </div>
+
+          <div class="color-card">
+            <label for="bgHex">Background</label>
+            <div class="compact-control compact-control--hex-only">
+              <button class="swatch-button" id="bgSwatch" type="button" aria-label="Pick background color"></button>
+              <input class="compact-hex" id="bgHex" type="text" value="#FAFAF8" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="color-card">
+            <label for="accentHexSoft">Trail Soft</label>
+            <div class="compact-control">
+              <button class="swatch-button" id="accentSwatchSoft" type="button" aria-label="Pick trail soft color"></button>
+              <input class="compact-hex" id="accentHexSoft" type="text" value="#2563EB" spellcheck="false" />
+              <div class="compact-opacity">
+                <input class="compact-number" id="weakOpacityNumber" type="number" min="0" max="100" step="1" value="40" />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="color-card">
+            <label for="accentHexStrong">Trail Strong</label>
+            <div class="compact-control">
+              <button class="swatch-button" id="accentSwatchStrong" type="button" aria-label="Pick trail strong color"></button>
+              <input class="compact-hex" id="accentHexStrong" type="text" value="#2563EB" spellcheck="false" />
+              <div class="compact-opacity">
+                <input class="compact-number" id="strongOpacityNumber" type="number" min="0" max="100" step="1" value="80" />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="color-card">
+            <label for="baseHex">Resting Dots</label>
+            <div class="compact-control">
+              <button class="swatch-button" id="baseSwatch" type="button" aria-label="Pick resting dots color"></button>
+              <input class="compact-hex" id="baseHex" type="text" value="#2B2B2B" spellcheck="false" />
+              <div class="compact-opacity">
+                <input class="compact-number" id="baseOpacityNumber" type="number" min="0" max="100" step="1" value="22" />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="sidebar-footer">
+          <label>Moving Mask</label>
+          <button class="toggle-button" id="maskOutlineToggle" type="button">Outline Off</button>
+        </div>
+      </div>
+    </aside>
+
+    <button class="sidebar-handle" id="panelToggle" type="button" aria-expanded="true" aria-controls="panelBody" aria-label="Close controls">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M10 10L30 30"></path>
+        <path d="M30 10L10 30"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="picker-panel" id="colorPicker" hidden>
+    <div class="picker-surface" id="pickerSurface">
+      <div class="picker-surface-handle" id="pickerSurfaceHandle"></div>
+    </div>
+    <div class="picker-sliders">
+      <div class="picker-slider-wrap">
+        <div class="picker-slider-track picker-slider-track--hue"></div>
+        <input class="picker-slider" id="pickerHue" type="range" min="0" max="360" step="1" value="0" />
+      </div>
+      <div class="picker-slider-wrap picker-alpha-wrap" id="pickerAlphaWrap">
+        <div class="picker-slider-track picker-slider-track--alpha" id="pickerAlphaTrack"></div>
+        <input class="picker-slider" id="pickerAlpha" type="range" min="0" max="100" step="1" value="100" />
+      </div>
+    </div>
+    <div class="picker-footer">
+      <div class="picker-mode">HEX</div>
+      <input class="picker-input picker-input--hex" id="pickerHexInput" type="text" spellcheck="false" value="#FFFFFF" />
+      <input class="picker-input picker-input--opacity" id="pickerOpacityInput" type="number" min="0" max="100" step="1" value="100" />
+      <span class="picker-percent" id="pickerPercent">%</span>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const TAU = Math.PI * 2;
+  const MDS = 5;
+
+  const WORDS = {
+    upper: {
+      vbW: 1472,
+      vbH: 374,
+      path: new Path2D(`M139.61 7.61508H216.268L355.878 365.524H279.22L208.146 170.578C205.438 163.132 203.407 157.548 202.054 153.825C201.038 150.102 199.008 144.687 195.962 137.579C191.9 125.734 188.854 117.103 186.823 111.688C185.131 105.934 182.254 97.3039 178.193 85.7966C174.132 97.9808 170.916 106.95 168.547 112.703C166.517 118.457 163.471 127.426 159.409 139.61C156.702 147.733 152.979 158.055 148.24 170.578L77.1662 365.524H0L139.61 7.61508ZM86.812 216.268H269.574V281.251H86.812V216.268Z M391.951 7.61508H468.102L587.405 193.931C592.481 202.392 596.204 208.653 598.574 212.715C601.281 216.776 605.173 222.699 610.25 230.483C613.634 235.898 616.173 239.791 617.865 242.16C619.896 244.529 622.434 248.421 625.48 253.836C625.48 240.637 625.48 227.268 625.48 213.73C625.48 201.884 625.48 189.869 625.48 177.685V7.61508H696.047V365.524H619.896L501.1 179.716C493.655 168.209 486.378 156.532 479.27 144.687C475.209 138.933 472.332 134.702 470.64 131.995C468.948 129.287 466.24 125.057 462.517 119.303C462.517 128.441 462.517 135.379 462.517 140.118C462.517 144.517 462.517 151.117 462.517 159.917C462.517 171.762 462.517 183.777 462.517 195.962V365.524H391.951V7.61508Z M764.773 7.61508H904.383C935.52 7.61508 963.95 15.3994 989.672 30.968C1015.73 46.5366 1036.04 68.0281 1050.59 95.4424C1065.15 122.518 1072.42 152.979 1072.42 186.823C1072.42 220.668 1065.15 251.129 1050.59 278.204C1036.04 305.28 1015.73 326.603 989.672 342.171C963.95 357.74 935.52 365.524 904.383 365.524H764.773V7.61508ZM897.275 297.496C915.89 297.496 932.812 293.265 948.042 284.804C963.273 276.005 975.457 263.482 984.595 247.236C993.733 230.653 998.302 210.515 998.302 186.823C998.302 163.132 993.733 142.994 984.595 126.41C975.457 109.826 963.273 97.3039 948.042 88.8427C932.812 80.043 915.89 75.6432 897.275 75.6432H836.862V297.496H897.275Z M1288.22 373.139C1252.69 373.139 1220.87 365.186 1192.78 349.279C1165.03 333.372 1143.2 311.372 1127.29 283.281C1111.72 255.19 1103.94 223.037 1103.94 186.823C1103.94 150.948 1111.72 118.795 1127.29 90.3657C1143.2 61.936 1165.03 39.7677 1192.78 23.8606C1220.87 7.95353 1252.69 0 1288.22 0C1323.42 0 1354.9 8.12275 1382.65 24.3683C1410.74 40.2753 1432.57 62.4437 1448.14 90.8734C1464.05 118.965 1472 150.948 1472 186.823C1472 222.699 1464.05 254.852 1448.14 283.281C1432.23 311.372 1410.4 333.372 1382.65 349.279C1354.9 365.186 1323.42 373.139 1288.22 373.139ZM1288.22 304.096C1309.21 304.096 1327.82 299.188 1344.07 289.373C1360.65 279.22 1373.51 265.343 1382.65 247.744C1391.79 229.806 1396.36 209.33 1396.36 186.316C1396.36 163.301 1391.79 142.994 1382.65 125.395C1373.51 107.796 1360.65 94.0886 1344.07 84.2736C1327.82 74.1202 1309.04 69.0434 1287.71 69.0434C1266.73 69.0434 1247.95 74.1202 1231.36 84.2736C1215.12 94.0886 1202.43 107.965 1193.29 125.903C1184.15 143.502 1179.58 163.809 1179.58 186.823C1179.58 210.176 1184.15 230.652 1193.29 248.252C1202.43 265.851 1215.12 279.558 1231.36 289.373C1247.95 299.188 1266.9 304.096 1288.22 304.096Z`)
+    },
+    lower: {
+      vbW: 1460,
+      vbH: 462,
+      path: new Path2D(`M117.352 461.712C82.296 461.712 53.8665 452.521 32.0634 434.138C10.6878 415.755 0 391.173 0 360.392C0 331.321 8.97774 308.236 26.9332 291.135C45.3162 274.035 70.5394 262.92 102.603 257.789L180.837 244.323C191.525 242.185 199.434 238.979 204.564 234.704C209.694 230.429 212.26 224.016 212.26 215.466C212.26 208.198 210.336 201.999 206.488 196.869C202.64 191.311 196.869 187.036 189.174 184.044C181.479 181.051 172.073 179.555 160.958 179.555C143.43 179.555 128.895 183.402 117.352 191.098C105.809 198.793 99.1827 210.122 97.4726 225.085H9.61901C10.9015 202.854 18.1692 183.189 31.4221 166.088C45.1025 148.56 63.058 135.307 85.2886 126.33C107.519 116.924 132.529 112.222 160.317 112.222C190.67 112.222 216.107 116.711 236.628 125.688C257.148 134.666 272.752 147.278 283.44 163.523C294.128 179.341 299.472 198.152 299.472 219.955V362.957C299.472 370.225 300.968 375.569 303.961 378.989C307.381 381.982 311.87 383.478 317.427 383.478C322.557 383.05 327.474 382.409 332.176 381.554V449.528C324.909 452.094 317 454.231 308.45 455.941C299.899 457.651 290.708 458.506 280.875 458.506C265.912 458.506 253.087 455.727 242.399 450.17C231.711 444.185 223.589 434.993 218.031 422.595C206.061 434.138 191.739 443.543 175.066 450.811C158.821 458.079 139.583 461.712 117.352 461.712ZM139.796 393.738C161.172 393.738 178.486 388.181 191.739 377.065C205.419 365.522 212.26 351.201 212.26 334.1V292.418C210.122 294.983 205.633 297.334 198.793 299.472C192.38 301.609 184.257 303.747 174.425 305.885L130.177 314.862C115.642 317.427 104.954 321.916 98.1139 328.329C91.2737 334.742 87.8536 343.506 87.8536 354.621C87.8536 362.744 89.9912 369.798 94.2663 375.783C98.5414 381.768 104.527 386.257 112.222 389.249C120.345 392.242 129.536 393.738 139.796 393.738Z M372.391 121.841H455.114V159.676C464.52 145.14 477.986 133.597 495.514 125.047C513.042 116.497 532.708 112.222 554.511 112.222C590.849 112.222 619.706 123.123 641.082 144.926C662.885 166.302 673.787 199.007 673.787 243.04V452.094H587.216V261.637C587.216 239.406 581.872 222.306 571.184 210.336C560.924 198.365 545.961 192.38 526.295 192.38C504.92 192.38 488.247 199.007 476.276 212.26C464.733 225.085 458.962 242.827 458.962 265.485V452.094H372.391V121.841Z M875.345 461.712C843.709 461.712 816.135 454.231 792.622 439.268C769.536 424.305 751.794 403.571 739.396 377.065C726.998 350.559 720.8 320.42 720.8 286.647C720.8 252.873 726.998 222.734 739.396 196.228C751.794 169.722 769.536 149.202 792.622 134.666C816.135 119.703 843.923 112.222 875.986 112.222C895.224 112.222 913.821 116.069 931.777 123.765C949.732 131.46 963.84 142.789 974.1 157.752V0H1060.67V452.094H977.948V411.694C967.687 427.939 953.152 440.337 934.342 448.887C915.531 457.437 895.866 461.712 875.345 461.712ZM893.3 383.478C909.546 383.478 924.081 379.844 936.907 372.576C949.732 364.881 959.778 353.766 967.046 339.23C974.741 324.268 978.589 306.74 978.589 286.647C978.589 266.553 974.741 249.239 967.046 234.704C959.778 220.168 949.732 209.267 936.907 201.999C924.081 194.304 909.546 190.456 893.3 190.456C876.2 190.456 861.237 194.304 848.412 201.999C836.014 209.267 826.395 220.168 819.555 234.704C812.715 248.812 809.294 266.126 809.294 286.647C809.294 307.167 812.715 324.695 819.555 339.23C826.395 353.766 836.014 364.881 848.412 372.576C861.237 379.844 876.2 383.478 893.3 383.478Z M1284.71 461.712C1249.66 461.712 1218.88 454.445 1192.37 439.909C1166.29 424.947 1145.99 404.212 1131.45 377.706C1116.92 351.201 1109.65 320.847 1109.65 286.647C1109.65 252.873 1116.92 222.734 1131.45 196.228C1145.99 169.722 1166.29 149.202 1192.37 134.666C1218.88 119.703 1249.66 112.222 1284.71 112.222C1319.77 112.222 1350.55 119.703 1377.06 134.666C1403.56 149.202 1423.87 169.722 1437.98 196.228C1452.51 222.734 1459.78 252.873 1459.78 286.647C1459.78 320.847 1452.51 351.201 1437.98 377.706C1423.87 404.212 1403.56 424.947 1377.06 439.909C1350.55 454.445 1319.77 461.712 1284.71 461.712ZM1284.71 383.478C1302.24 383.478 1317.42 379.844 1330.24 372.576C1343.5 364.881 1353.76 353.766 1361.02 339.23C1368.29 324.695 1371.93 307.167 1371.93 286.647C1371.93 266.126 1368.29 248.812 1361.02 234.704C1353.76 220.168 1343.5 209.267 1330.24 201.999C1317.42 194.304 1302.24 190.456 1284.71 190.456C1267.61 190.456 1252.44 194.304 1239.18 201.999C1226.36 209.267 1216.1 220.168 1208.4 234.704C1201.14 248.812 1197.5 266.126 1197.5 286.647C1197.5 307.167 1201.14 324.695 1208.4 339.23C1216.1 353.766 1226.36 364.881 1239.18 372.576C1252.44 379.844 1267.61 383.478 1284.71 383.478Z`)
+    }
+  };
+  const IVB_W = 321;
+  const IVB_H = 336;
+  const IDLE_PATH = new Path2D("M285.423 0C304.812 0 320.529 15.7174 320.529 35.1056V210.633C320.529 230.022 304.812 245.739 285.423 245.739L257.951 245.74H227.684C226.052 245.74 224.487 246.394 223.34 247.554L136.82 335.087C134.902 337.028 131.595 335.669 131.595 332.941V201.399C131.595 198.255 132.981 195.27 135.383 193.24L215.39 125.612L224.528 117.518C228.734 113.793 226.099 106.843 220.48 106.843H97.7372C93.5226 106.843 90.1057 110.26 90.1056 114.475V239.634C90.1056 243.005 87.3721 245.739 84.0002 245.739H35.1056C15.7173 245.739 6.39671e-05 230.022 0 210.633V35.1056C0.000119574 15.7174 15.7174 2.49741e-05 35.1056 0H285.423Z");
+
+  const DEFAULTS = {
+    word: 'upper',
+    cell: 4,
+    rBase: 10,
+    rSpd: 0.72,
+    rMax: 54,
+    dotR: 0.84,
+    weakA: 0.40,
+    strongA: 0.60,
+    strongP: 0.04,
+    baseR: 0.72,
+    baseA: 0.20,
+    baseHex: '#000000',
+    accentHexWeak: '#51A6F5',
+    accentHexStrong: '#51A6F5',
+    bgHex: '#FFFFFF',
+    showMaskOutline: false
+  };
+  const cfg = { ...DEFAULTS };
+
+  const FOLLOW_EASE = 1;
+  const TRAIL_SHRINK_MS = 4400;
+  const TRAIL_MIN_SHRINK_SPEED = 0.78;
+  const TRAIL_MAX_SHRINK_SPEED = 1.32;
+  const HOVER_ALPHA_THRESHOLD = 12;
+  const HOVER_BASE_RADIUS = 34;
+  const HOVER_PULSE_RADIUS = 22;
+  const TRAIL_DEFAULT_HEIGHT_RATIO = 1 / 3;
+  const TRAIL_DYNAMIC_HEIGHT_RATIO = 0.08;
+  const RESTING_WAVE_SPEED = 0.00009;
+  const RESTING_WAVE_DENSITY = 1.15;
+  const RESTING_WAVE_WOBBLE = 0.04;
+  const RESTING_WAVE_WOBBLE_SPEED = 0.00015;
+
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0;
+  let H = 0;
+  let cx;
+  let cy;
+  let trailEdge;
+  let trailActive;
+  let trailVisible;
+  let trailStartedAt;
+  let strong;
+  let strongCluster;
+  let N = 0;
+  let bandCY = 0;
+  let bandH = 0;
+  let px = 0;
+  let py = 0;
+  let hasPointer = false;
+  let followerX = 0;
+  let followerY = 0;
+  let trailSpeed = 0;
+  let lastPointerInputAt = -Infinity;
+  let maskCanvas;
+  let maskCtx;
+  let maskW = 0;
+  let maskH = 0;
+  let dotPattern;
+  let hitAlpha;
+  let hitW = 0;
+  let hitH = 0;
+  let resizeFrame = 0;
+  let pickerDragCleanup = null;
+  const pickerState = {
+    open: false,
+    colorKey: null,
+    alphaKey: null,
+    syncColor: null,
+    syncAlpha: null,
+    hue: 0,
+    sat: 0,
+    val: 1,
+    alpha: 1,
+    anchor: null
+  };
+
+  const inputs = {
+    panel: document.querySelector('.panel'),
+    panelToggle: document.getElementById('panelToggle'),
+    wordUpper: document.getElementById('wordUpper'),
+    wordLower: document.getElementById('wordLower'),
+    bgSwatch: document.getElementById('bgSwatch'),
+    bgHex: document.getElementById('bgHex'),
+    accentSwatchSoft: document.getElementById('accentSwatchSoft'),
+    accentHexSoft: document.getElementById('accentHexSoft'),
+    accentSwatchStrong: document.getElementById('accentSwatchStrong'),
+    accentHexStrong: document.getElementById('accentHexStrong'),
+    baseSwatch: document.getElementById('baseSwatch'),
+    baseHex: document.getElementById('baseHex'),
+    weakOpacityNumber: document.getElementById('weakOpacityNumber'),
+    strongOpacityNumber: document.getElementById('strongOpacityNumber'),
+    baseOpacityNumber: document.getElementById('baseOpacityNumber'),
+    maskOutlineToggle: document.getElementById('maskOutlineToggle'),
+    colorPicker: document.getElementById('colorPicker'),
+    pickerSurface: document.getElementById('pickerSurface'),
+    pickerSurfaceHandle: document.getElementById('pickerSurfaceHandle'),
+    pickerHue: document.getElementById('pickerHue'),
+    pickerAlphaWrap: document.getElementById('pickerAlphaWrap'),
+    pickerAlphaTrack: document.getElementById('pickerAlphaTrack'),
+    pickerAlpha: document.getElementById('pickerAlpha'),
+    pickerHexInput: document.getElementById('pickerHexInput'),
+    pickerOpacityInput: document.getElementById('pickerOpacityInput'),
+    pickerPercent: document.getElementById('pickerPercent')
+  };
+
+  function getSidebarIcon(isOpen){
+    return isOpen
+      ? '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M10 10L30 30"></path><path d="M30 10L10 30"></path></svg>'
+      : '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 9V31"></path><path d="M9 20H31"></path></svg>';
+  }
+
+  function clamp(value, min, max){
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function normalizeHex(value, fallback){
+    const raw = String(value || '').trim();
+    const prefixed = raw.startsWith('#') ? raw : `#${raw}`;
+    if (/^#[0-9a-fA-F]{6}$/.test(prefixed)) return prefixed.toUpperCase();
+    if (/^#[0-9a-fA-F]{3}$/.test(prefixed)) {
+      return `#${prefixed.slice(1).split('').map((part) => part + part).join('').toUpperCase()}`;
+    }
+    return fallback;
+  }
+
+  function hexToRgb(hex){
+    const normalized = normalizeHex(hex, '#000000');
+    return {
+      r: parseInt(normalized.slice(1, 3), 16),
+      g: parseInt(normalized.slice(3, 5), 16),
+      b: parseInt(normalized.slice(5, 7), 16)
+    };
+  }
+
+  function rgbToHex(r, g, b){
+    const parts = [r, g, b].map((channel) => clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0'));
+    return `#${parts.join('').toUpperCase()}`;
+  }
+
+  function rgbToHsv(r, g, b){
+    const rn = r / 255;
+    const gn = g / 255;
+    const bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const delta = max - min;
+    let hue = 0;
+    if (delta) {
+      if (max === rn) hue = ((gn - bn) / delta) % 6;
+      else if (max === gn) hue = (bn - rn) / delta + 2;
+      else hue = (rn - gn) / delta + 4;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+    }
+    return {
+      h: hue,
+      s: max === 0 ? 0 : delta / max,
+      v: max
+    };
+  }
+
+  function hsvToRgb(h, s, v){
+    const hue = ((h % 360) + 360) % 360;
+    const chroma = v * s;
+    const segment = hue / 60;
+    const x = chroma * (1 - Math.abs((segment % 2) - 1));
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if (segment >= 0 && segment < 1) [r, g, b] = [chroma, x, 0];
+    else if (segment < 2) [r, g, b] = [x, chroma, 0];
+    else if (segment < 3) [r, g, b] = [0, chroma, x];
+    else if (segment < 4) [r, g, b] = [0, x, chroma];
+    else if (segment < 5) [r, g, b] = [x, 0, chroma];
+    else [r, g, b] = [chroma, 0, x];
+    const match = v - chroma;
+    return {
+      r: Math.round((r + match) * 255),
+      g: Math.round((g + match) * 255),
+      b: Math.round((b + match) * 255)
+    };
+  }
+
+  function rgba(hex, alpha){
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function snap(value){
+    return Math.round(value * dpr) / dpr;
+  }
+
+  function snapSize(value){
+    return Math.max(1 / dpr, Math.round(value * dpr) / dpr);
+  }
+
+  function hash01(x, y, seed = 0){
+    const raw = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+    return raw - Math.floor(raw);
+  }
+
+  function strongClusterValue(x, y, width, height){
+    const nx = x / Math.max(1, width);
+    const ny = y / Math.max(1, height);
+    const band = Math.sin((nx * 4.2 + ny * 2.7) * TAU + 0.9) * 0.22;
+    const bloom = Math.sin((nx * -5.4 + ny * 6.3) * TAU + 2.4) * 0.18;
+    const drift = Math.cos((nx * 8.8 - ny * 5.1) * TAU + 1.7) * 0.16;
+    const pocket = Math.sin((nx * 13.0 + ny * 11.5) * TAU + 4.6) * 0.11;
+    const grain = (hash01(x, y, 9) - 0.5) * 0.28;
+    const spark = (hash01(x, y, 19) - 0.5) * 0.14;
+    return clamp(0.5 + band + bloom + drift + pocket + grain + spark, 0, 1);
+  }
+
+  function livingCellOffset(x, y, now, clusterStrength = 0.5){
+    const t = now * 0.00022;
+    const flow = 0.55 + clusterStrength * 1.35;
+    const swirlA = Math.sin(x * 0.025 + y * 0.014 + t * 1.3);
+    const swirlB = Math.cos(x * 0.012 - y * 0.02 - t * 0.9);
+    const swirlC = Math.sin((x + y) * 0.009 + t * 0.7);
+    return {
+      x: (swirlA + swirlC * 0.7) * flow,
+      y: (swirlB - swirlC * 0.5) * flow
+    };
+  }
+
+  function syncSwatch(button, value){
+    button.style.setProperty('--swatch', value);
+  }
+
+  function buildField(){
+    const word = WORDS[cfg.word];
+    const off = document.createElement('canvas');
+    off.width = Math.max(1, Math.floor(W));
+    off.height = Math.max(1, Math.floor(H));
+    const o = off.getContext('2d');
+
+    const scale = Math.min(W / word.vbW, H / word.vbH);
+    const dw = word.vbW * scale;
+    const dh = word.vbH * scale;
+    const ox = (W - dw) / 2;
+    const oy = (H - dh) / 2;
+    const visTop = Math.max(0, oy);
+    const visBot = Math.min(H, oy + dh);
+    bandCY = (visTop + visBot) / 2;
+    bandH = visBot - visTop;
+
+    o.save();
+    o.translate(ox, oy);
+    o.scale(scale, scale);
+    o.fillStyle = '#000';
+    o.fill(word.path);
+    o.restore();
+
+    const img = o.getImageData(0, 0, off.width, off.height).data;
+    hitAlpha = img;
+    hitW = off.width;
+    hitH = off.height;
+    const cols = Math.ceil(W / cfg.cell);
+    const rows = Math.ceil(H / cfg.cell);
+    const xs = [];
+    const ys = [];
+    const st = [];
+    const cl = [];
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const sx = Math.floor(col * cfg.cell + cfg.cell / 2);
+        const sy = Math.floor(row * cfg.cell + cfg.cell / 2);
+        if (sx >= off.width || sy >= off.height) continue;
+        const a = img[(sy * off.width + sx) * 4 + 3] / 255;
+        if (a > 0.5) {
+          xs.push(sx);
+          ys.push(sy);
+          const cluster = strongClusterValue(sx, sy, off.width, off.height);
+          cl.push(cluster);
+          st.push(cluster > 0.56 ? 1 : 0);
+        }
+      }
+    }
+
+    N = xs.length;
+    cx = new Float32Array(xs);
+    cy = new Float32Array(ys);
+    strong = new Uint8Array(st);
+    strongCluster = new Float32Array(cl);
+    trailEdge = new Float32Array(N);
+    trailEdge.fill(1);
+    trailActive = new Uint8Array(N);
+    trailVisible = new Uint8Array(N);
+    trailStartedAt = new Float64Array(N);
+  }
+
+  function createDotPattern(){
+    const tileSize = Math.max(4, Math.round(cfg.cell));
+    const tile = document.createElement('canvas');
+    tile.width = tileSize;
+    tile.height = tileSize;
+    const tileCtx = tile.getContext('2d');
+    tileCtx.clearRect(0, 0, tileSize, tileSize);
+    tileCtx.fillStyle = 'rgba(0,0,0,0.04)';
+    tileCtx.beginPath();
+    tileCtx.arc(tileSize * 0.5, tileSize * 0.5, Math.max(0.7, cfg.baseR), 0, TAU);
+    tileCtx.fill();
+    dotPattern = ctx.createPattern(tile, 'repeat');
+  }
+
+  function resize(){
+    const rect = stage.getBoundingClientRect();
+    W = rect.width;
+    H = rect.height;
+    dpr = Math.min(4, Math.max(1, (window.devicePixelRatio || 1) * 2));
+    canvas.style.width = `${Math.round(W)}px`;
+    canvas.style.height = `${Math.round(H)}px`;
+    canvas.width = Math.ceil(W * dpr);
+    canvas.height = Math.ceil(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    maskW = Math.max(1, Math.ceil(W / MDS));
+    maskH = Math.max(1, Math.ceil(H / MDS));
+    maskCanvas = document.createElement('canvas');
+    maskCanvas.width = maskW;
+    maskCanvas.height = maskH;
+    maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+    maskCtx.imageSmoothingEnabled = false;
+    createDotPattern();
+    buildField();
+  }
+
+  function scheduleResize(){
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      resize();
+    });
+  }
+
+  function getIdleTransform(now){
+    const t = now * 0.001;
+    return {
+      driftX: W * 0.5 + Math.sin(t * 0.17) * W * 0.30 + Math.sin(t * 0.083 + 1.3) * W * 0.10,
+      driftY: bandCY + Math.sin(t * 0.13 + 0.5) * bandH * 0.42 + Math.cos(t * 0.06) * bandH * 0.16,
+      rot: t * 0.09 + Math.sin(t * 0.05) * 0.5,
+      scl: (bandH / IVB_H) * 1.45 * (1 + 0.45 * Math.sin(t * 0.07 + 0.7))
+    };
+  }
+
+  function applyIdlePathTransform(targetCtx, transform){
+    targetCtx.translate(transform.driftX, transform.driftY);
+    targetCtx.rotate(transform.rot);
+    targetCtx.scale(transform.scl, transform.scl);
+    targetCtx.translate(-IVB_W / 2, -IVB_H / 2);
+  }
+
+  function getIdleMask(now){
+    const transform = getIdleTransform(now);
+    maskCtx.setTransform(1, 0, 0, 1, 0, 0);
+    maskCtx.clearRect(0, 0, maskW, maskH);
+    maskCtx.save();
+    maskCtx.scale(1 / MDS, 1 / MDS);
+    applyIdlePathTransform(maskCtx, transform);
+    maskCtx.fillStyle = '#000';
+    maskCtx.fill(IDLE_PATH);
+    maskCtx.restore();
+    return {
+      data: maskCtx.getImageData(0, 0, maskW, maskH).data,
+      transform
+    };
+  }
+
+  function drawBackdropDots(idleMaskState, prevX, prevY, nextX, nextY, segmentActive, segmentRadius){
+    if (!dotPattern) return;
+    ctx.save();
+    ctx.fillStyle = dotPattern;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'destination-out';
+
+    if (idleMaskState) {
+      ctx.save();
+      applyIdlePathTransform(ctx, idleMaskState.transform);
+      ctx.fillStyle = '#000';
+      ctx.fill(IDLE_PATH);
+      ctx.restore();
+    }
+
+    if (hasPointer) {
+      if (segmentActive) {
+        ctx.beginPath();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = segmentRadius * 2;
+        ctx.strokeStyle = '#000';
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(nextX, nextY);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.fillStyle = '#000';
+      ctx.arc(nextX, nextY, segmentRadius, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawMaskOutline(idleMaskState){
+    if (!cfg.showMaskOutline || !idleMaskState) return;
+    ctx.save();
+    applyIdlePathTransform(ctx, idleMaskState.transform);
+    ctx.strokeStyle = '#FF5900';
+    ctx.lineWidth = 1 / Math.max(idleMaskState.transform.scl, 0.0001);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke(IDLE_PATH);
+    ctx.restore();
+  }
+
+  function pointSegmentDistSq(x, y, x1, y1, x2, y2){
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) {
+      const ax = x - x1;
+      const ay = y - y1;
+      return ax * ax + ay * ay;
+    }
+    const t = clamp(((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy), 0, 1);
+    const px0 = x1 + dx * t;
+    const py0 = y1 + dy * t;
+    const ax = x - px0;
+    const ay = y - py0;
+    return ax * ax + ay * ay;
+  }
+
+  function isPointOnWord(x, y){
+    if (!hitAlpha) return false;
+    const pulse = Math.sin(performance.now() * 0.01);
+    const hoverRadius = Math.max(1, HOVER_BASE_RADIUS + HOVER_PULSE_RADIUS * pulse);
+    const radiusCeil = Math.ceil(hoverRadius);
+    const radiusSq = hoverRadius * hoverRadius;
+    const sx = Math.floor(x);
+    const sy = Math.floor(y);
+
+    for (let offsetY = -radiusCeil; offsetY <= radiusCeil; offsetY += 1) {
+      const py0 = sy + offsetY;
+      if (py0 < 0 || py0 >= hitH) continue;
+      for (let offsetX = -radiusCeil; offsetX <= radiusCeil; offsetX += 1) {
+        if (offsetX * offsetX + offsetY * offsetY > radiusSq) continue;
+        const px0 = sx + offsetX;
+        if (px0 < 0 || px0 >= hitW) continue;
+        if (hitAlpha[(py0 * hitW + px0) * 4 + 3] > HOVER_ALPHA_THRESHOLD) return true;
+      }
+    }
+    return false;
+  }
+
+  function setCursorState(isOverWord){
+    const cursor = isOverWord ? 'crosshair' : 'default';
+    stage.style.cursor = cursor;
+    canvas.style.cursor = cursor;
+  }
+
+  function smoothstep(value){
+    return value * value * (3 - 2 * value);
+  }
+
+  function getTrailShrinkSpeed(x, y){
+    const broadWave = Math.sin(x * 0.011 + y * 0.006);
+    const fineWave = Math.sin(x * 0.027 - y * 0.019 + 1.7);
+    const variation = clamp(0.5 + broadWave * 0.32 + fineWave * 0.18, 0, 1);
+    return TRAIL_MIN_SHRINK_SPEED +
+      (TRAIL_MAX_SHRINK_SPEED - TRAIL_MIN_SHRINK_SPEED) * variation;
+  }
+
+  function queuePointerSegment(nx, ny){
+    if (!hasPointer) {
+      hasPointer = true;
+      followerX = nx;
+      followerY = ny;
+      trailSpeed = 0;
+    }
+    px = nx;
+    py = ny;
+    lastPointerInputAt = performance.now();
+  }
+
+  function getAdaptiveTrailRadius(now){
+    const letterHeight = Math.max(1, bandH);
+    const defaultRadius = letterHeight * TRAIL_DEFAULT_HEIGHT_RATIO * 0.5;
+    const dynamicRange = letterHeight * TRAIL_DYNAMIC_HEIGHT_RATIO;
+    const speedNorm = clamp(trailSpeed / 22, 0, 1);
+    const slowRadius = 20;
+    const fastRadius = clamp(defaultRadius + dynamicRange * 0.7, slowRadius + 4, letterHeight * 0.3);
+    const baseRadius = slowRadius + (fastRadius - slowRadius) * smoothstep(speedNorm);
+    const pulseBias = Math.sin(now * 0.0032 + trailSpeed * 0.045) * dynamicRange * (0.28 + speedNorm * 0.22);
+    return clamp(
+      baseRadius + pulseBias,
+      slowRadius,
+      letterHeight * 0.3
+    );
+  }
+
+  function getRestingWaveBand(x, y, now){
+    const normalizedX = x / Math.max(W, 1);
+    const normalizedY = y / Math.max(H, 1);
+    const wobble =
+      Math.sin(normalizedX * TAU * 1.4 + now * RESTING_WAVE_WOBBLE_SPEED) * RESTING_WAVE_WOBBLE +
+      Math.sin(normalizedX * TAU * 3.2 - now * RESTING_WAVE_WOBBLE_SPEED * 1.7) * (RESTING_WAVE_WOBBLE * 0.35);
+    const phase = (normalizedY + wobble) * RESTING_WAVE_DENSITY - now * RESTING_WAVE_SPEED;
+    const wave = Math.sin(phase * TAU);
+    if (wave > 0.72) return 2;
+    if (wave > -0.72) return 1;
+    return 0;
+  }
+
+  function frame(now){
+    ctx.clearRect(0, 0, W, H);
+
+    const idleMaskState = reduceMotion ? null : getIdleMask(now);
+    const idleMask = idleMaskState ? idleMaskState.data : null;
+    const prevFollowerX = followerX;
+    const prevFollowerY = followerY;
+    if (hasPointer) {
+      followerX += (px - followerX) * FOLLOW_EASE;
+      followerY += (py - followerY) * FOLLOW_EASE;
+    }
+    const segDX = followerX - prevFollowerX;
+    const segDY = followerY - prevFollowerY;
+    const moveDist = Math.hypot(segDX, segDY);
+    trailSpeed = trailSpeed * 0.92 + moveDist * 0.08;
+    const segmentActive = moveDist > 0.001;
+    const segmentRadius = getAdaptiveTrailRadius(now);
+    const segmentR2 = segmentRadius * segmentRadius;
+    drawBackdropDots(idleMaskState, prevFollowerX, prevFollowerY, followerX, followerY, segmentActive, segmentRadius);
+
+    const restingLevels = [
+      clamp(cfg.baseA * 0.5, 0, 1),
+      clamp(cfg.baseA, 0, 1),
+      clamp(cfg.baseA * 2, 0, 1)
+    ];
+    const restingPaths = [new Path2D(), new Path2D(), new Path2D()];
+    const scaledBaseR = cfg.baseR;
+    const scaledDotR = cfg.dotR;
+
+    for (let i = 0; i < N; i += 1) {
+      let idleActive = false;
+      if (idleMask) {
+        const sx = (cx[i] / MDS) | 0;
+        const sy = (cy[i] / MDS) | 0;
+        if (sx >= 0 && sy >= 0 && sx < maskW && sy < maskH && idleMask[(sy * maskW + sx) * 4 + 3] > 40) {
+          idleActive = true;
+        }
+      }
+
+      const segmentDistanceSq = segmentActive
+        ? pointSegmentDistSq(cx[i], cy[i], prevFollowerX, prevFollowerY, followerX, followerY)
+        : Infinity;
+      if (segmentDistanceSq <= segmentR2) {
+        const edge = Math.sqrt(segmentDistanceSq) / Math.max(1, segmentRadius);
+        if (trailActive[i]) {
+          trailEdge[i] = Math.min(trailEdge[i], edge);
+        } else {
+          trailEdge[i] = edge;
+          trailStartedAt[i] = now;
+        }
+        trailActive[i] = 1;
+      }
+
+      const trailAge = now - trailStartedAt[i];
+      const shrinkProgress = Math.max(0, trailAge / TRAIL_SHRINK_MS);
+      const localEnvelope = Math.max(
+        0,
+        1 - shrinkProgress * getTrailShrinkSpeed(cx[i], cy[i])
+      );
+      if (trailActive[i] && trailEdge[i] > localEnvelope) {
+        trailActive[i] = 0;
+      }
+      trailVisible[i] = trailActive[i];
+
+      if (!trailVisible[i] && !idleActive) {
+        const path = restingPaths[getRestingWaveBand(cx[i], cy[i], now)];
+        path.moveTo(cx[i] + scaledBaseR, cy[i]);
+        path.arc(cx[i], cy[i], scaledBaseR, 0, TAU);
+      }
+    }
+    for (let index = 0; index < restingPaths.length; index += 1) {
+      ctx.fillStyle = rgba(cfg.baseHex, restingLevels[index]);
+      ctx.fill(restingPaths[index]);
+    }
+
+    const weakFill = rgba(cfg.accentHexWeak, cfg.weakA);
+    const strongFill = rgba(cfg.accentHexStrong, cfg.strongA);
+    const dotRadius = snapSize(Math.max(scaledDotR, scaledBaseR));
+    for (let i = 0; i < N; i += 1) {
+      let idleActive = false;
+      if (idleMask) {
+        const sx = (cx[i] / MDS) | 0;
+        const sy = (cy[i] / MDS) | 0;
+        idleActive = sx >= 0 && sy >= 0 && sx < maskW && sy < maskH && idleMask[(sy * maskW + sx) * 4 + 3] > 40;
+      }
+      if (idleActive && !trailVisible[i]) {
+        if (strong[i]) {
+          const live = livingCellOffset(cx[i], cy[i], now, strongCluster[i] || 0.5);
+          const x = snap(cx[i] + live.x);
+          const y = snap(cy[i] + live.y);
+          ctx.fillStyle = rgba(cfg.accentHexStrong, Math.min(0.18, cfg.strongA * 0.18));
+          ctx.beginPath();
+          ctx.arc(x, y, dotRadius * 1.14, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = strongFill;
+          ctx.beginPath();
+          ctx.arc(x, y, dotRadius * 1.06, 0, TAU);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = weakFill;
+          ctx.beginPath();
+          ctx.arc(snap(cx[i]), snap(cy[i]), dotRadius, 0, TAU);
+          ctx.fill();
+        }
+      }
+      if (!trailVisible[i]) continue;
+      if (strong[i]) {
+        const x = snap(cx[i]);
+        const y = snap(cy[i]);
+        ctx.fillStyle = rgba(cfg.accentHexStrong, Math.min(0.18, cfg.strongA * 0.18));
+        ctx.beginPath();
+        ctx.arc(x, y, dotRadius * 1.14, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = strongFill;
+        ctx.beginPath();
+        ctx.arc(x, y, dotRadius * 1.06, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = weakFill;
+        ctx.beginPath();
+        ctx.arc(snap(cx[i]), snap(cy[i]), dotRadius, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    drawMaskOutline(idleMaskState);
+
+    requestAnimationFrame(frame);
+  }
+
+  function updateTheme(){
+    document.documentElement.style.setProperty('--bg', cfg.bgHex);
+    document.documentElement.style.setProperty('--accent', cfg.accentHexWeak);
+  }
+
+  function syncColorPair(swatchButton, textInput, value){
+    syncSwatch(swatchButton, value);
+    textInput.value = value;
+  }
+
+  function syncOpacityInput(numberInput, decimal){
+    numberInput.value = Math.round(decimal * 100);
+  }
+
+  function applyPaletteToInputs(){
+    syncColorPair(inputs.bgSwatch, inputs.bgHex, cfg.bgHex);
+    syncColorPair(inputs.accentSwatchSoft, inputs.accentHexSoft, cfg.accentHexWeak);
+    syncColorPair(inputs.accentSwatchStrong, inputs.accentHexStrong, cfg.accentHexStrong);
+    syncColorPair(inputs.baseSwatch, inputs.baseHex, cfg.baseHex);
+    syncOpacityInput(inputs.weakOpacityNumber, cfg.weakA);
+    syncOpacityInput(inputs.strongOpacityNumber, cfg.strongA);
+    syncOpacityInput(inputs.baseOpacityNumber, cfg.baseA);
+    updateTheme();
+  }
+
+  function syncWordButtons(){
+    inputs.wordUpper.classList.toggle('is-active', cfg.word === 'upper');
+    inputs.wordLower.classList.toggle('is-active', cfg.word === 'lower');
+  }
+
+  function syncMaskOutlineButton(){
+    inputs.maskOutlineToggle.classList.toggle('is-active', cfg.showMaskOutline);
+    inputs.maskOutlineToggle.textContent = cfg.showMaskOutline ? 'Outline On' : 'Outline Off';
+  }
+
+  function setWord(word){
+    cfg.word = word;
+    syncWordButtons();
+    buildField();
+  }
+
+  function setPanelOpen(isOpen){
+    document.body.classList.toggle('sidebar-open', isOpen);
+    document.body.classList.toggle('sidebar-closed', !isOpen);
+    inputs.panel.classList.toggle('is-open', isOpen);
+    inputs.panel.classList.toggle('is-collapsed', !isOpen);
+    inputs.panelToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    inputs.panelToggle.setAttribute('aria-label', isOpen ? 'Close controls' : 'Open controls');
+    inputs.panelToggle.innerHTML = getSidebarIcon(isOpen);
+    scheduleResize();
+    clearTimeout(sidebarResizeTimer);
+    sidebarResizeTimer = setTimeout(scheduleResize, 320);
+  }
+
+  function getPickerHex(){
+    const { r, g, b } = hsvToRgb(pickerState.hue, pickerState.sat, pickerState.val);
+    return rgbToHex(r, g, b);
+  }
+
+  function positionColorPicker(anchor){
+    const rect = anchor.getBoundingClientRect();
+    const pickerRect = inputs.colorPicker.getBoundingClientRect();
+    const gap = 12;
+    const maxLeft = window.innerWidth - pickerRect.width - 12;
+    const maxTop = window.innerHeight - pickerRect.height - 12;
+    let left = rect.left - pickerRect.width - gap;
+    if (left < 12) left = rect.right + gap;
+    if (left > maxLeft) left = maxLeft;
+    let top = rect.top - 6;
+    if (top > maxTop) top = maxTop;
+    if (top < 12) top = 12;
+    inputs.colorPicker.style.left = `${left}px`;
+    inputs.colorPicker.style.top = `${top}px`;
+  }
+
+  function renderColorPicker(){
+    const hueColor = `hsl(${pickerState.hue} 100% 50%)`;
+    const hex = getPickerHex();
+    const { r, g, b } = hexToRgb(hex);
+    inputs.pickerSurface.style.background = `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, ${hueColor})`;
+    inputs.pickerSurfaceHandle.style.left = `${pickerState.sat * 100}%`;
+    inputs.pickerSurfaceHandle.style.top = `${(1 - pickerState.val) * 100}%`;
+    inputs.pickerHue.value = Math.round(pickerState.hue);
+    inputs.pickerHexInput.value = hex;
+    const showAlpha = Boolean(pickerState.alphaKey);
+    inputs.pickerAlphaWrap.classList.toggle('is-hidden', !showAlpha);
+    inputs.pickerPercent.classList.toggle('is-hidden', !showAlpha);
+    inputs.pickerOpacityInput.disabled = !showAlpha;
+    inputs.pickerOpacityInput.value = Math.round((showAlpha ? pickerState.alpha : 1) * 100);
+    inputs.pickerAlpha.value = Math.round((showAlpha ? pickerState.alpha : 1) * 100);
+    inputs.pickerAlphaTrack.style.setProperty('--alpha-start', `rgba(${r},${g},${b},0)`);
+    inputs.pickerAlphaTrack.style.setProperty('--alpha-end', `rgba(${r},${g},${b},1)`);
+  }
+
+  function commitPicker(){
+    if (!pickerState.colorKey) return;
+    const hex = getPickerHex();
+    cfg[pickerState.colorKey] = hex;
+    if (pickerState.alphaKey) cfg[pickerState.alphaKey] = pickerState.alpha;
+    if (pickerState.syncColor) pickerState.syncColor(hex);
+    if (pickerState.syncAlpha) pickerState.syncAlpha(pickerState.alpha);
+    updateTheme();
+    renderColorPicker();
+  }
+
+  function closeColorPicker(){
+    inputs.colorPicker.hidden = true;
+    pickerState.open = false;
+    pickerState.anchor = null;
+    if (pickerDragCleanup) {
+      pickerDragCleanup();
+      pickerDragCleanup = null;
+    }
+  }
+
+  function openColorPicker(options){
+    const rgb = hexToRgb(cfg[options.colorKey]);
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    pickerState.open = true;
+    pickerState.colorKey = options.colorKey;
+    pickerState.alphaKey = options.alphaKey || null;
+    pickerState.syncColor = options.syncColor || null;
+    pickerState.syncAlpha = options.syncAlpha || null;
+    pickerState.hue = hsv.h;
+    pickerState.sat = hsv.s;
+    pickerState.val = hsv.v;
+    pickerState.alpha = options.alphaKey ? cfg[options.alphaKey] : 1;
+    pickerState.anchor = options.anchor;
+    inputs.colorPicker.hidden = false;
+    renderColorPicker();
+    positionColorPicker(options.anchor);
+  }
+
+  function startSurfaceDrag(event){
+    event.preventDefault();
+    const updateFromPoint = (clientX, clientY) => {
+      const rect = inputs.pickerSurface.getBoundingClientRect();
+      pickerState.sat = clamp((clientX - rect.left) / rect.width, 0, 1);
+      pickerState.val = clamp(1 - (clientY - rect.top) / rect.height, 0, 1);
+      commitPicker();
+    };
+    updateFromPoint(event.clientX, event.clientY);
+    const handleMove = (moveEvent) => updateFromPoint(moveEvent.clientX, moveEvent.clientY);
+    const handleUp = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      pickerDragCleanup = null;
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp, { once: true });
+    pickerDragCleanup = handleUp;
+  }
+
+  function bindHexControl(swatchButton, textInput, key, sync){
+    const commit = (raw) => {
+      cfg[key] = normalizeHex(raw, cfg[key]);
+      sync(cfg[key]);
+      updateTheme();
+    };
+    textInput.addEventListener('change', () => commit(textInput.value));
+    textInput.addEventListener('blur', () => commit(textInput.value));
+  }
+
+  function bindPickerTrigger(swatchButton, options){
+    swatchButton.addEventListener('click', () => {
+      if (pickerState.open && pickerState.anchor === swatchButton) {
+        closeColorPicker();
+        return;
+      }
+      openColorPicker({
+        anchor: swatchButton,
+        colorKey: options.colorKey,
+        alphaKey: options.alphaKey,
+        syncColor: options.syncColor,
+        syncAlpha: options.syncAlpha
+      });
+    });
+  }
+
+  function bindOpacityControl(numberInput, key){
+    const commit = (raw) => {
+      const percent = clamp(Number(raw) || 0, 0, 100);
+      cfg[key] = percent / 100;
+      numberInput.value = percent;
+    };
+    numberInput.addEventListener('input', () => commit(numberInput.value));
+    numberInput.addEventListener('blur', () => commit(numberInput.value));
+  }
+
+  stage.addEventListener('pointermove', (event) => {
+    const rect = stage.getBoundingClientRect();
+    const nx = event.clientX - rect.left;
+    const ny = event.clientY - rect.top;
+    queuePointerSegment(nx, ny);
+    setCursorState(isPointOnWord(nx, ny));
+  });
+  stage.addEventListener('pointerleave', () => {
+    hasPointer = false;
+    setCursorState(false);
+  });
+
+  bindHexControl(inputs.bgSwatch, inputs.bgHex, 'bgHex', (value) => syncColorPair(inputs.bgSwatch, inputs.bgHex, value));
+  bindHexControl(inputs.accentSwatchSoft, inputs.accentHexSoft, 'accentHexWeak', (value) => {
+    syncColorPair(inputs.accentSwatchSoft, inputs.accentHexSoft, value);
+  });
+  bindHexControl(inputs.accentSwatchStrong, inputs.accentHexStrong, 'accentHexStrong', (value) => {
+    syncColorPair(inputs.accentSwatchStrong, inputs.accentHexStrong, value);
+  });
+  bindHexControl(inputs.baseSwatch, inputs.baseHex, 'baseHex', (value) => syncColorPair(inputs.baseSwatch, inputs.baseHex, value));
+  bindOpacityControl(inputs.weakOpacityNumber, 'weakA');
+  bindOpacityControl(inputs.strongOpacityNumber, 'strongA');
+  bindOpacityControl(inputs.baseOpacityNumber, 'baseA');
+  bindPickerTrigger(inputs.bgSwatch, {
+    colorKey: 'bgHex',
+    syncColor: (value) => syncColorPair(inputs.bgSwatch, inputs.bgHex, value)
+  });
+  bindPickerTrigger(inputs.accentSwatchSoft, {
+    colorKey: 'accentHexWeak',
+    alphaKey: 'weakA',
+    syncColor: (value) => {
+      syncColorPair(inputs.accentSwatchSoft, inputs.accentHexSoft, value);
+    },
+    syncAlpha: (value) => syncOpacityInput(inputs.weakOpacityNumber, value)
+  });
+  bindPickerTrigger(inputs.accentSwatchStrong, {
+    colorKey: 'accentHexStrong',
+    alphaKey: 'strongA',
+    syncColor: (value) => {
+      syncColorPair(inputs.accentSwatchStrong, inputs.accentHexStrong, value);
+    },
+    syncAlpha: (value) => syncOpacityInput(inputs.strongOpacityNumber, value)
+  });
+  bindPickerTrigger(inputs.baseSwatch, {
+    colorKey: 'baseHex',
+    alphaKey: 'baseA',
+    syncColor: (value) => syncColorPair(inputs.baseSwatch, inputs.baseHex, value),
+    syncAlpha: (value) => syncOpacityInput(inputs.baseOpacityNumber, value)
+  });
+  inputs.wordUpper.addEventListener('click', () => setWord('upper'));
+  inputs.wordLower.addEventListener('click', () => setWord('lower'));
+  inputs.maskOutlineToggle.addEventListener('click', () => {
+    cfg.showMaskOutline = !cfg.showMaskOutline;
+    syncMaskOutlineButton();
+  });
+  inputs.pickerSurface.addEventListener('pointerdown', startSurfaceDrag);
+  inputs.pickerHue.addEventListener('input', () => {
+    pickerState.hue = Number(inputs.pickerHue.value);
+    commitPicker();
+  });
+  inputs.pickerAlpha.addEventListener('input', () => {
+    pickerState.alpha = clamp(Number(inputs.pickerAlpha.value) / 100, 0, 1);
+    commitPicker();
+  });
+  inputs.pickerHexInput.addEventListener('change', () => {
+    const normalized = normalizeHex(inputs.pickerHexInput.value, getPickerHex());
+    const rgb = hexToRgb(normalized);
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    pickerState.hue = hsv.h;
+    pickerState.sat = hsv.s;
+    pickerState.val = hsv.v;
+    commitPicker();
+  });
+  inputs.pickerHexInput.addEventListener('blur', () => {
+    const normalized = normalizeHex(inputs.pickerHexInput.value, getPickerHex());
+    const rgb = hexToRgb(normalized);
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    pickerState.hue = hsv.h;
+    pickerState.sat = hsv.s;
+    pickerState.val = hsv.v;
+    commitPicker();
+  });
+  inputs.pickerOpacityInput.addEventListener('input', () => {
+    if (!pickerState.alphaKey) return;
+    pickerState.alpha = clamp((Number(inputs.pickerOpacityInput.value) || 0) / 100, 0, 1);
+    commitPicker();
+  });
+  inputs.pickerOpacityInput.addEventListener('blur', () => {
+    if (!pickerState.alphaKey) return;
+    pickerState.alpha = clamp((Number(inputs.pickerOpacityInput.value) || 0) / 100, 0, 1);
+    commitPicker();
+  });
+  inputs.panelToggle.addEventListener('click', () => {
+    setPanelOpen(!inputs.panel.classList.contains('is-open'));
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!pickerState.open) return;
+    if (inputs.colorPicker.contains(event.target)) return;
+    if (event.target.closest('.swatch-button')) return;
+    closeColorPicker();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && pickerState.open) closeColorPicker();
+  });
+
+  let resizeTimer;
+  let sidebarResizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(scheduleResize, 120);
+    if (pickerState.open && pickerState.anchor) {
+      requestAnimationFrame(() => positionColorPicker(pickerState.anchor));
+    }
+  });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    const stageObserver = new ResizeObserver(() => {
+      scheduleResize();
+    });
+    stageObserver.observe(stage);
+  }
+
+  applyPaletteToInputs();
+  syncWordButtons();
+  syncMaskOutlineButton();
+  setPanelOpen(true);
+  setCursorState(false);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
